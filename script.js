@@ -687,7 +687,7 @@ function showValidationResult(errors, warnings) {
   if (errors.length === 0 && warnings.length === 0) {
     // 完全正确
     html += `<div class="validation-result validation-success">`;
-    html += `<strong>✓ 验证通过！</strong><br>`;
+    html += `<strong>✓ 验证通过！请前往UMU平台完成活动2问卷</strong><br>`;
     html += `博弈树结构完整且正确，所有节点和连接关系都符合要求。`;
     html += `</div>`;
   } else {
