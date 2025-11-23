@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>井字棋博弈树构建 - 探究活动</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f0f2f5;
+        color: #333;
+      }
+      .header {
+        text-align: center;
+        padding: 20px;
+        background-color: #1e3a8a;
+        color: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        width: 100%;
+      }
+      h1 {
+        margin: 0;
+        font-size: 2em;
+        text-align: center;
+      }
+      .container {
+        max-width: 1800px;
+        margin: 20px auto;
+        display: flex;
+        gap: 20px;
+        padding: 0 20px;
+        box-sizing: border-box;
+      }
+      .palette-section,
+      .workspace-section {
+        min-width: 300px;
+      }
+      .palette-section {
+        width: 320px;
+      }
+      .workspace-section {
+        flex-grow: 1;
+      }
+      .section-title {
+        text-align: center;
+        color: #1e40af;
+        margin-top: 0;
+        margin-bottom: 15px;
+        padding: 10px;
+        background-color: #dbeafe;
+        border-radius: 6px;
+      }
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+      .section-header .section-title {
+        margin-bottom: 0;
+        flex: 1;
+      }
+      .section-header .controls {
+        margin-left: 15px;
+        margin-bottom: 0;
+      }
+      button {
+        padding: 10px 18px;
+        font-size: 1em;
+        background-color: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      button:hover {
+        background-color: #2563eb;
+      }
+      .controls {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-bottom: 15px;
+      }
+      .palette {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px;
+        background-color: #ffffff;
+        border: 2px dashed #cbd5e1;
+        border-radius: 8px;
+        height: calc(80vh + 80px);
+        overflow-y: auto;
+      }
+      .palette-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .node-label {
+        font-weight: bold;
+        color: #1e40af;
+        font-size: 1.1em;
+        margin-top: 5px;
+      }
+      .draggable-node {
+        width: 120px;
+        height: 120px;
+        border: 2px solid #60a5fa;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #eff6ff;
+        cursor: move;
+        user-select: none;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        position: relative;
+        margin: 0 auto;
+      }
+      .ttt-board {
+        width: 90px;
+        height: 90px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-gap: 2px;
+        background-color: #60a5fa;
+        padding: 2px;
+      }
+      .cell {
+        width: 28px;
+        height: 28px;
+        background-color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.2em;
+      }
+      .cell.new-move-o {
+        color: #3fe7f3;
+        font-weight: 900;
+        /* text-shadow: 0 0 3px rgba(63, 204, 243, 0.5); */
+        /* transform: scale(1.1); */
+      }
+      .cell.new-move-x {
+        color: #ef4444;
+        font-weight: 900;
+        /* text-shadow: 0 0 3px rgba(239, 68, 68, 0.5); */
+        /* transform: scale(1.1); */
+      }
+      .delete-btn {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 24px;
+        height: 24px;
+        background-color: #ef4444;
+        color: white;
+        border: 2px solid white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        z-index: 10;
+      }
+      .connection-point {
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 12px;
+        height: 12px;
+        background-color: #94a3b8;
+        border: 2px solid #64748b;
+        border-radius: 50%;
+        cursor: crosshair;
+        z-index: 5;
+        transition: all 0.2s ease;
+      }
+      .connection-point:hover {
+        background-color: #3b82f6;
+        border-color: #2563eb;
+        transform: translateX(-50%) scale(1.3);
+      }
+      .workspace {
+        min-height: 80vh;
+        padding: 20px;
+        background-color: #ffffff;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        position: relative;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+      .workspace-placeholder {
+        text-align: center;
+        color: #94a3b8;
+        font-size: 1.2em;
+        margin-top: 200px;
+      }
+      .status {
+        text-align: center;
+        margin-top: 10px;
+        font-weight: bold;
+        color: #059669;
+      }
+      svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+      }
+      line {
+        stroke: #333;
+        stroke-width: 2;
+        marker-end: url(#arrowhead);
+      }
+      defs marker {
+        fill: #333;
+      }
+
+      /* 问题区域样式 */
+      .questions-section {
+        margin: 30px auto;
+        max-width: 1800px;
+        padding: 0 20px;
+      }
+
+      .questions-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        color: white;
+        padding: 30px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      }
+	  
+	  .fill-in-blank-input {
+		width: 40px;
+		padding: 4px;
+		border: 1px solid #ccc;
+		text-align: center;
+	  }
+
+      .questions-title {
+        text-align: center;
+        margin-bottom: 25px;
+        font-size: 1.8em;
+        color: white;
+        border-bottom: 3px solid rgba(255, 255, 255, 0.3);
+        padding-bottom: 15px;
+      }
+
+      .question-group {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .question-group h4 {
+        color: #ffd700;
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 1.3em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .question-group h4:before {
+        content: "🔍";
+        font-size: 1.2em;
+      }
+
+      .question-group:nth-child(2) h4:before {
+        content: "🎯";
+      }
+
+      .question-group:nth-child(3) h4:before {
+        content: "🤖";
+      }
+
+      .question-item {
+        margin: 12px 0;
+        padding-left: 20px;
+        position: relative;
+        line-height: 1.5;
+      }
+
+      .question-item:before {
+        content: "•";
+        color: #ffd700;
+        position: absolute;
+        left: 0;
+        font-size: 1.2em;
+      }
+
+      .thinking-hint {
+        font-style: italic;
+        color: #e0e0e0;
+        font-size: 0.95em;
+        margin-top: 8px;
+        padding-left: 20px;
+        border-left: 2px solid #ffd700;
+        padding-top: 5px;
+        padding-bottom: 5px;
+      }
+
+      .board-reference {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 2px 8px;
+        border-radius: 4px;
+        margin: 0 4px;
+        font-weight: bold;
+      }
+
+      /* 回答框样式 */
+      .answer-box {
+        width: 100%;
+        min-height: 80px;
+        margin-top: 10px;
+        padding: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        font-family: inherit;
+        font-size: 1em;
+        resize: vertical;
+        box-sizing: border-box;
+        transition: all 0.3s ease;
+      }
+
+      .answer-box:focus {
+        outline: none;
+        border-color: #ffd700;
+        background: rgba(255, 255, 255, 0.15);
+        box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+      }
+
+      .answer-box::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .answer-label {
+        display: block;
+        margin: 15px 0 8px 0;
+        color: #ffd700;
+        font-weight: bold;
+      }
+
+      /* 验证模态框样式 */
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        animation: fadeIn 0.3s;
+      }
+
+      .modal-content {
+        background-color: #ffffff;
+        margin: 10% auto;
+        padding: 30px;
+        border-radius: 12px;
+        width: 80%;
+        max-width: 600px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        animation: slideDown 0.3s;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes slideDown {
+        from {
+          transform: translateY(-50px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #e2e8f0;
+      }
+
+      .modal-title {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #1e40af;
+      }
+
+      .modal-close {
+        font-size: 28px;
+        font-weight: bold;
+        color: #94a3b8;
+        cursor: pointer;
+        border: none;
+        background: none;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+      }
+
+      .modal-close:hover {
+        color: #ef4444;
+      }
+
+      .validation-result {
+        margin: 15px 0;
+        padding: 15px;
+        border-radius: 8px;
+      }
+
+      .validation-success {
+        background-color: #d1fae5;
+        border-left: 4px solid #10b981;
+        color: #065f46;
+      }
+
+      .validation-error {
+        background-color: #fee2e2;
+        border-left: 4px solid #ef4444;
+        color: #991b1b;
+      }
+
+      .validation-warning {
+        background-color: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        color: #92400e;
+      }
+
+      .validation-item {
+        margin: 8px 0;
+        padding: 8px;
+        background-color: rgba(255, 255, 255, 0.7);
+        border-radius: 4px;
+      }
+
+      .validation-item.success {
+        color: #059669;
+      }
+
+      .validation-item.error {
+        color: #dc2626;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>活动2 博弈树构建</h1>
+    </div>
+
+    <div class="container">
+      <!-- 左侧棋盘库部分 -->
+      <div class="palette-section">
+        <h2 class="section-title">棋盘库</h2>
+        <div class="palette" id="nodePalette">
+          <!-- 棋盘A -->
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">A</div>
+          </div>
+          <!-- 棋盘C -->
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell"></div>
+                <div class="cell">O</div>
+                <div class="cell"></div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">C</div>
+          </div>
+          <!-- 棋盘D -->
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">D</div>
+          </div>
+          <!-- 其他棋盘... -->
+          <!-- 棋盘B -->
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell">O</div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">B</div>
+          </div>
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell"></div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">E</div>
+          </div>
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell">O</div>
+                <div class="cell"></div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">F</div>
+          </div>
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell"></div>
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">G</div>
+          </div>
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">K</div>
+          </div>
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell"></div>
+                <div class="cell">X</div>
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">H</div>
+          </div>
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">I</div>
+          </div>
+          <div class="palette-item">
+            <div class="draggable-node" draggable="true">
+              <div class="ttt-board">
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell">X</div>
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">O</div>
+                <div class="cell">X</div>
+              </div>
+            </div>
+            <div class="node-label">J</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧工作区部分 -->
+      <div class="workspace-section">
+        <div class="section-header">
+          <h2 class="section-title">博弈树构建区</h2>
+          <div class="controls">
+            <button onclick="validateGameTree()">验证博弈树</button>
+          </div>
+        </div>
+        <div class="workspace" id="workspace">
+          <div class="workspace-placeholder">
+            将棋盘从左侧拖拽到这里开始构建博弈树...
+          </div>
+          <svg id="arrow-svg">
+            <defs>
+              <marker
+                id="arrowhead"
+                markerWidth="10"
+                markerHeight="7"
+                refX="10"
+                refY="3.5"
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+              </marker>
+            </defs>
+          </svg>
+        </div>
+        <div class="status" id="statusMessage">
+          就绪。拖拽节点移动，点击连接点绘制箭头！
+        </div>
+      </div>
+    </div>
+
+    <!-- 策略探究问题区域 -->
+    <div class="questions-section">
+      <div class="questions-container">
+        <h2 class="questions-title">🎯 构建完成博弈树后，思考以下问题</h2>
+
+        <div class="question-group">
+		  <h4>胜负可能性分析</h4>
+		  <div class="question-item">从初始棋盘<span class="board-reference">A</span>开始：</div>
+		  <div class="question-item">（1）先手(O)能够获胜的结果有 <input type="text" class="fill-in-blank-input" maxlength="2"> 种？</div>
+		  <div class="question-item">（2）后手(X)能够获胜的结果有 <input type="text" class="fill-in-blank-input" maxlength="2"> 种？</div>
+		  <div class="question-item">（3）平局的结果有 <input type="text" class="fill-in-blank-input" maxlength="2"> 种？</div>
+		</div>
+
+        <div class="question-group">
+          <h4>最优策略推演</h4>
+		  <div class="question-item">从初始棋盘<span class="board-reference">A</span>开始：</div>
+          <div class="question-item">（1） 如果先手(O)足够聪明，总能选择最佳走法，最终会是什么结局？ <input type="text" class="fill-in-blank-input" maxlength="2"> </div>
+          <div class="question-item">（2） 如果后手(X)也足够聪明，总能最优应对，结局会改变吗？ <input type="text" class="fill-in-blank-input" maxlength="2"> </div>
+          <div class="question-item">（3） 如果从棋盘<span class="board-reference">C</span>开始，最优策略下的结局是什么？ <input type="text" class="fill-in-blank-input" maxlength="2"> </div>
+          <div class="question-item">（4） 如果从棋盘<span class="board-reference">D</span>开始，结果又会如何？ <input type="text" class="fill-in-blank-input" maxlength="2"> </div>
+        </div>
+
+        <div class="question-group">
+          <h4>AI设计思考</h4>
+          <div class="question-item">
+            请根据以上问题思考，如果让你设计一个AI来下棋，它会如何"思考"并选择下一步？
+          </div>
+          <!-- <div class="question-item">- 它会如何"思考"并选择下一步？</div> -->
+          <!-- <div class="question-item">- 它需要向前看多少步才能保证不输？</div> -->
+          <!-- <div class="question-item">- 面对不同的棋盘局面，它的决策过程会有什么不同？</div> -->
+
+          <span class="answer-label">你的AI设计方案：</span>
+          <textarea
+            class="answer-box"
+            placeholder="请在此描述你设计的AI思考过程和决策逻辑..."
+          ></textarea>
+
+          <div class="thinking-hint">
+            提示：结合你在构建博弈树过程中的体验，想象AI的思考过程
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let isDragging = false;
+      let draggedElement = null;
+      let offsetX, offsetY;
+      let isConnecting = false;
+      let startNode = null;
+      let connectionLine = null;
+      const connectionLinesMap = new Map();
+      window.connectionsArray = [];
+
+      // 所有棋盘的状态定义
+      const boardStates = {
+        "A": ["O", "O", "X", "X", "", "", "", "O", "X"],
+        "B": ["O", "O", "X", "X", "O", "", "", "O", "X"],
+        "C": ["O", "O", "X", "X", "", "O", "", "O", "X"],
+        "D": ["O", "O", "X", "X", "", "", "O", "O", "X"],
+        "E": ["O", "O", "X", "X", "", "O", "X", "O", "X"],
+        "F": ["O", "O", "X", "X", "X", "O", "", "O", "X"],
+        "G": ["O", "O", "X", "X", "X", "", "O", "O", "X"],
+        "H": ["O", "O", "X", "X", "", "X", "O", "O", "X"],
+        "I": ["O", "O", "X", "X", "O", "O", "X", "O", "X"],
+        "J": ["O", "O", "X", "X", "X", "O", "O", "O", "X"],
+        "K": ["O", "O", "X", "X", "X", "O", "O", "O", "X"]
+      };
+
+      // 定义每个棋盘的父棋盘关系
+      const parentBoard = {
+        "A": null,  // A是根节点，没有父节点
+        "B": "A",
+        "C": "A",
+        "D": "A",
+        "E": "C",
+        "F": "C",
+        "G": "D",
+        "H": "D",
+        "I": "E",
+        "J": "F",
+        "K": "G"
+      };
+
+      // 随机打乱棋盘库中的棋盘顺序
+      function shufflePalette() {
+        const palette = document.getElementById("nodePalette");
+        const items = Array.from(palette.querySelectorAll(".palette-item"));
+        
+        // Fisher-Yates 洗牌算法
+        for (let i = items.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [items[i], items[j]] = [items[j], items[i]];
+        }
+        
+        // 重新排列DOM元素
+        items.forEach((item) => {
+          palette.appendChild(item);
+        });
+      }
+
+      // 标记新下的棋子
+      function markNewMoves() {
+        const palette = document.getElementById("nodePalette");
+        const boards = palette.querySelectorAll(".ttt-board");
+        
+        boards.forEach((board) => {
+          // 获取棋盘标签
+          const paletteItem = board.closest(".palette-item");
+          const labelElement = paletteItem.querySelector(".node-label");
+          const boardLabel = labelElement ? labelElement.textContent.trim() : null;
+          
+          if (!boardLabel || !boardStates[boardLabel]) return;
+          
+          const cells = board.querySelectorAll(".cell");
+          const currentBoard = Array.from(cells).map(cell => cell.textContent.trim());
+          
+          // 获取父棋盘
+          const parentLabel = parentBoard[boardLabel];
+          if (!parentLabel || !boardStates[parentLabel]) {
+            // 如果没有父棋盘（如棋盘A），不标记
+            return;
+          }
+          
+          const parentBoardState = boardStates[parentLabel];
+          
+          // 找出与父棋盘不同的位置（新下的棋子）
+          // 找出所有不同的位置，标记索引最大的那个（最后下的棋子）
+          let lastNewMoveIndex = -1;
+          for (let i = 0; i < 9; i++) {
+            if (parentBoardState[i] !== currentBoard[i] && currentBoard[i] !== "") {
+              // 记录新棋子的位置
+              lastNewMoveIndex = i;
+            }
+          }
+          // 标记最后下的棋子（索引最大的那个），根据棋子类型使用不同颜色
+          if (lastNewMoveIndex >= 0) {
+            const newMovePiece = currentBoard[lastNewMoveIndex];
+            if (newMovePiece === "O") {
+              cells[lastNewMoveIndex].classList.add("new-move-o");
+            } else if (newMovePiece === "X") {
+              cells[lastNewMoveIndex].classList.add("new-move-x");
+            }
+          }
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        const palette = document.getElementById("nodePalette");
+        const workspace = document.getElementById("workspace");
+        const arrowSvg = document.getElementById("arrow-svg");
+
+        // 随机打乱棋盘库中的棋盘顺序
+        shufflePalette();
+
+        // 标记棋盘库中所有新下的棋子
+        markNewMoves();
+
+        // 页面加载完成后自动添加棋盘A到工作区
+        initializeWorkspaceWithBoardA();
+
+        function initializeWorkspaceWithBoardA() {
+          // 移除占位符
+          const placeholder = workspace.querySelector(".workspace-placeholder");
+          if (placeholder) placeholder.remove();
+
+          // 创建棋盘A节点
+          const nodeA = document.createElement("div");
+          nodeA.className = "draggable-node";
+          nodeA.id = "node_initial_A";
+          nodeA.style.position = "absolute";
+          nodeA.style.left = "50%";
+          nodeA.style.top = "20px";
+          nodeA.style.transform = "translateX(-50%)";
+
+          // 添加棋盘内容
+          const board = document.createElement("div");
+          board.className = "ttt-board";
+          board.innerHTML = `
+                    <div class="cell">O</div><div class="cell">O</div><div class="cell">X</div>
+                    <div class="cell">X</div><div class="cell"></div><div class="cell"></div>
+                    <div class="cell"></div><div class="cell">O</div><div class="cell">X</div>
+                `;
+          nodeA.appendChild(board);
+
+          // 添加标签
+          const nodeLabel = document.createElement("div");
+          nodeLabel.className = "node-label";
+          nodeLabel.textContent = "A";
+          nodeLabel.style.position = "absolute";
+          nodeLabel.style.bottom = "-25px";
+          nodeLabel.style.left = "50%";
+          nodeLabel.style.transform = "translateX(-50%)";
+          nodeLabel.style.fontWeight = "bold";
+          nodeLabel.style.color = "#1e40af";
+          nodeA.appendChild(nodeLabel);
+
+          // 添加连接点
+          const connectionPoint = document.createElement("div");
+          connectionPoint.className = "connection-point";
+          nodeA.appendChild(connectionPoint);
+
+          // 添加删除按钮
+          const deleteBtn = document.createElement("div");
+          deleteBtn.className = "delete-btn";
+          deleteBtn.textContent = "×";
+          deleteBtn.onclick = function (event) {
+            event.stopPropagation();
+            // 初始节点不允许删除
+            document.getElementById("statusMessage").textContent =
+              "初始节点不能删除！";
+          };
+          nodeA.appendChild(deleteBtn);
+
+          // 添加事件监听器
+          connectionPoint.addEventListener(
+            "mousedown",
+            handleConnectionPointMouseDown
+          );
+          nodeA.addEventListener("mousedown", handleNodeMouseDown);
+
+          // 将节点添加到工作区
+          workspace.appendChild(nodeA);
+
+          // 更新状态消息
+          document.getElementById("statusMessage").textContent =
+            "初始棋盘A已加载！请开始构建博弈树。";
+        }
+
+        function setupDraggableNodes() {
+          const nodes = palette.querySelectorAll(".draggable-node");
+          nodes.forEach((node) => {
+            node.addEventListener("dragstart", function (e) {
+              const label =
+                this.closest(".palette-item").querySelector(
+                  ".node-label"
+                ).textContent;
+              e.dataTransfer.setData("text/html", e.target.outerHTML);
+              e.dataTransfer.setData("text/plain", label);
+              e.dataTransfer.effectAllowed = "copy";
+            });
+          });
+        }
+        setupDraggableNodes();
+
+        workspace.addEventListener("dragover", function (e) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+        });
+
+        workspace.addEventListener("drop", function (e) {
+          e.preventDefault();
+          const html = e.dataTransfer.getData("text/html");
+          const label = e.dataTransfer.getData("text/plain");
+
+          if (html) {
+            const placeholder = workspace.querySelector(
+              ".workspace-placeholder"
+            );
+            if (placeholder) placeholder.remove();
+
+            const newNode = document.createElement("div");
+            newNode.innerHTML = html;
+            const nodeElement = newNode.firstChild;
+
+            nodeElement.id =
+              "node_" + Date.now() + Math.random().toString(36).substring(2, 7);
+
+            nodeElement.style.position = "absolute";
+            nodeElement.style.left =
+              e.clientX - workspace.getBoundingClientRect().left - 60 + "px";
+            nodeElement.style.top =
+              e.clientY - workspace.getBoundingClientRect().top - 60 + "px";
+            nodeElement.removeAttribute("draggable");
+
+            const nodeLabel = document.createElement("div");
+            nodeLabel.className = "node-label";
+            nodeLabel.textContent = label;
+            nodeLabel.style.position = "absolute";
+            nodeLabel.style.bottom = "-25px";
+            nodeLabel.style.left = "50%";
+            nodeLabel.style.transform = "translateX(-50%)";
+            nodeLabel.style.fontWeight = "bold";
+            nodeLabel.style.color = "#1e40af";
+            nodeElement.appendChild(nodeLabel);
+
+            const connectionPoint = document.createElement("div");
+            connectionPoint.className = "connection-point";
+            nodeElement.appendChild(connectionPoint);
+
+            const deleteBtn = document.createElement("div");
+            deleteBtn.className = "delete-btn";
+            deleteBtn.textContent = "×";
+            deleteBtn.onclick = function (event) {
+              event.stopPropagation();
+              // 检查是否是初始节点A
+              if (nodeElement.id === "node_initial_A") {
+                document.getElementById("statusMessage").textContent =
+                  "初始节点不能删除！";
+                return;
+              }
+              
+              // 计算实际节点数量（排除svg和placeholder）
+              const nodes = workspace.querySelectorAll(".draggable-node");
+              if (nodes.length <= 1) {
+                // 如果只剩一个节点（初始节点A），清空并重新初始化
+                workspace.innerHTML =
+                  '<div class="workspace-placeholder">将节点从左侧拖拽到这里开始构建你的博弈树...</div>';
+                const newSvg = document.createElement("svg");
+                newSvg.id = "arrow-svg";
+                newSvg.innerHTML =
+                  '<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#333" /></marker></defs>';
+                workspace.appendChild(newSvg);
+                connectionLinesMap.clear();
+                window.connectionsArray = [];
+                // 重新初始化初始节点A
+                initializeWorkspaceWithBoardA();
+              } else {
+                removeNodeConnections(nodeElement);
+                nodeElement.remove();
+              }
+              document.getElementById("statusMessage").textContent =
+                "节点已删除。";
+            };
+            nodeElement.appendChild(deleteBtn);
+
+            connectionPoint.addEventListener(
+              "mousedown",
+              handleConnectionPointMouseDown
+            );
+            nodeElement.addEventListener("mousedown", handleNodeMouseDown);
+
+            workspace.appendChild(nodeElement);
+            
+            // 确保新添加的节点也标记了新棋子
+            const newBoard = nodeElement.querySelector(".ttt-board");
+            if (newBoard) {
+              // 获取棋盘标签
+              const boardLabel = label;
+              
+              if (boardLabel && boardStates[boardLabel]) {
+                const cells = newBoard.querySelectorAll(".cell");
+                const currentBoard = Array.from(cells).map(cell => cell.textContent.trim());
+                
+                // 获取父棋盘
+                const parentLabel = parentBoard[boardLabel];
+                if (parentLabel && boardStates[parentLabel]) {
+                  const parentBoardState = boardStates[parentLabel];
+                  
+                  // 找出与父棋盘不同的位置（新下的棋子）
+                  // 找出所有不同的位置，标记索引最大的那个（最后下的棋子）
+                  let lastNewMoveIndex = -1;
+                  for (let i = 0; i < 9; i++) {
+                    if (parentBoardState[i] !== currentBoard[i] && currentBoard[i] !== "") {
+                      // 记录新棋子的位置
+                      lastNewMoveIndex = i;
+                    }
+                  }
+                  // 标记最后下的棋子（索引最大的那个），根据棋子类型使用不同颜色
+                  if (lastNewMoveIndex >= 0) {
+                    const newMovePiece = currentBoard[lastNewMoveIndex];
+                    if (newMovePiece === "O") {
+                      cells[lastNewMoveIndex].classList.add("new-move-o");
+                    } else if (newMovePiece === "X") {
+                      cells[lastNewMoveIndex].classList.add("new-move-x");
+                    }
+                  }
+                }
+              }
+            }
+            
+            document.getElementById("statusMessage").textContent =
+              "节点已添加！可拖动调整位置或点击节点下方连接点绘制箭头。";
+          }
+        });
+
+        function handleNodeMouseDown(e) {
+          // 如果点击的是连接点、删除按钮或标签，不触发拖拽
+          if (
+            e.target.classList.contains("connection-point") ||
+            e.target.classList.contains("delete-btn") ||
+            e.target.classList.contains("node-label")
+          ) {
+            return;
+          }
+
+          // 允许拖拽节点（包括点击单元格时）
+          if (e.currentTarget.classList.contains("draggable-node")) {
+            e.preventDefault();
+            isDragging = true;
+            draggedElement = e.currentTarget;
+            // 清除transform属性，避免位置计算错误
+            draggedElement.style.transform = "none";
+            const rect = draggedElement.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            document.getElementById("statusMessage").textContent =
+              "正在拖动节点...";
+          }
+        }
+
+        document.addEventListener("mousemove", function (e) {
+          if (isDragging && draggedElement) {
+            e.preventDefault();
+            const workspaceRect = workspace.getBoundingClientRect();
+            let newLeft = e.clientX - workspaceRect.left - offsetX;
+            let newTop = e.clientY - workspaceRect.top - offsetY;
+
+            const nodeWidth = draggedElement.offsetWidth;
+            const nodeHeight = draggedElement.offsetHeight;
+            newLeft = Math.max(
+              0,
+              Math.min(newLeft, workspaceRect.width - nodeWidth)
+            );
+            newTop = Math.max(
+              0,
+              Math.min(newTop, workspaceRect.height - nodeHeight)
+            );
+
+            // 确保transform已被清除
+            draggedElement.style.transform = "none";
+            draggedElement.style.left = newLeft + "px";
+            draggedElement.style.top = newTop + "px";
+          }
+        });
+
+        document.addEventListener("mouseup", function (e) {
+          if (isDragging) {
+            isDragging = false;
+            if (draggedElement) {
+              redrawConnections();
+              document.getElementById("statusMessage").textContent =
+                "节点移动完成。";
+            }
+            draggedElement = null;
+          }
+          if (isConnecting) {
+            finishConnection(e);
+          }
+        });
+        
+        // 处理页面失去焦点或窗口关闭时清理连接状态
+        window.addEventListener("beforeunload", function() {
+          if (isConnecting && connectionLine) {
+            const arrowSvg = document.getElementById("arrow-svg");
+            if (arrowSvg && arrowSvg.contains(connectionLine)) {
+              arrowSvg.removeChild(connectionLine);
+            }
+            document.removeEventListener("mousemove", updateConnectionLine);
+          }
+        });
+        
+        // 处理鼠标离开窗口时取消连接
+        document.addEventListener("mouseleave", function() {
+          if (isConnecting && connectionLine) {
+            const arrowSvg = document.getElementById("arrow-svg");
+            if (arrowSvg && arrowSvg.contains(connectionLine)) {
+              arrowSvg.removeChild(connectionLine);
+            }
+            document.removeEventListener("mousemove", updateConnectionLine);
+            isConnecting = false;
+            startNode = null;
+            connectionLine = null;
+            document.getElementById("statusMessage").textContent =
+              "连接已取消。";
+          }
+        });
+
+        function handleConnectionPointMouseDown(e) {
+          e.stopPropagation();
+          e.preventDefault();
+
+          // 如果已经在连接中，先取消之前的连接
+          if (isConnecting && connectionLine) {
+            arrowSvg.removeChild(connectionLine);
+            connectionLine = null;
+            document.removeEventListener("mousemove", updateConnectionLine);
+          }
+
+          startNode = e.currentTarget.parentElement;
+          isConnecting = true;
+          document.getElementById("statusMessage").textContent =
+            "点击并拖动连接点以创建箭头...";
+
+          const rect = startNode.getBoundingClientRect();
+          const workspaceRect = workspace.getBoundingClientRect();
+
+          const startX = rect.left + rect.width / 2 - workspaceRect.left;
+          const startY = rect.top + rect.height + 2 - workspaceRect.top;
+
+          connectionLine = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          connectionLine.setAttribute("x1", startX);
+          connectionLine.setAttribute("y1", startY);
+          connectionLine.setAttribute("x2", startX);
+          connectionLine.setAttribute("y2", startY);
+          connectionLine.setAttribute("stroke", "#333");
+          connectionLine.setAttribute("stroke-width", "2");
+          connectionLine.setAttribute("marker-end", "url(#arrowhead)");
+          arrowSvg.appendChild(connectionLine);
+
+          document.addEventListener("mousemove", updateConnectionLine);
+        }
+
+        // updateConnectionLine 已移到全局作用域
+
+        function finishConnection(e) {
+          if (!isConnecting) return;
+
+          if (connectionLine) {
+            arrowSvg.removeChild(connectionLine);
+            connectionLine = null;
+          }
+
+          const targetNode = document.elementFromPoint(e.clientX, e.clientY);
+          const actualTargetNode = targetNode?.closest(".draggable-node");
+
+          if (actualTargetNode && actualTargetNode !== startNode) {
+            const rect = actualTargetNode.getBoundingClientRect();
+            const relativeY = e.clientY - rect.top;
+            if (relativeY <= rect.height / 2) {
+              const exists = window.connectionsArray.some(
+                (conn) =>
+                  conn.from === startNode && conn.to === actualTargetNode
+              );
+              if (!exists) {
+                const line = drawConnection(startNode, actualTargetNode);
+                if (line) {
+                  const key = `${startNode.id}->${actualTargetNode.id}`;
+                  connectionLinesMap.set(key, line);
+                  window.connectionsArray.push({
+                    from: startNode,
+                    to: actualTargetNode,
+                  });
+                }
+                document.getElementById("statusMessage").textContent =
+                  "箭头已创建！";
+              } else {
+                document.getElementById("statusMessage").textContent =
+                  "该连接已存在。";
+              }
+            } else {
+              document.getElementById("statusMessage").textContent =
+                "请将箭头连接到目标节点的上半部分。";
+            }
+          } else {
+            document.getElementById("statusMessage").textContent =
+              "连接已取消。";
+          }
+
+          isConnecting = false;
+          startNode = null;
+          document.removeEventListener("mousemove", updateConnectionLine);
+        }
+
+        function drawConnection(fromNode, toNode) {
+          if (!workspace.contains(fromNode) || !workspace.contains(toNode)) {
+            return null;
+          }
+          const fromRect = fromNode.getBoundingClientRect();
+          const toRect = toNode.getBoundingClientRect();
+          const workspaceRect = workspace.getBoundingClientRect();
+
+          const x1 = fromRect.left + fromRect.width / 2 - workspaceRect.left;
+          const y1 = fromRect.top + fromRect.height + 2 - workspaceRect.top;
+
+          const x2 = toRect.left + toRect.width / 2 - workspaceRect.left;
+          const y2 = toRect.top - workspaceRect.top;
+
+          const line = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          line.setAttribute("x1", x1);
+          line.setAttribute("y1", y1);
+          line.setAttribute("x2", x2);
+          line.setAttribute("y2", y2);
+          line.setAttribute("stroke", "#333");
+          line.setAttribute("stroke-width", "2");
+          line.setAttribute("marker-end", "url(#arrowhead)");
+
+          arrowSvg.appendChild(line);
+          return line;
+        }
+
+        function redrawConnections() {
+          // 只选择line元素，排除defs中的marker
+          const lines = arrowSvg.querySelectorAll('line');
+          lines.forEach((line) => {
+            if (arrowSvg.contains(line)) {
+              arrowSvg.removeChild(line);
+            }
+          });
+          connectionLinesMap.clear();
+
+          window.connectionsArray.forEach((conn) => {
+            if (workspace.contains(conn.from) && workspace.contains(conn.to)) {
+              const line = drawConnection(conn.from, conn.to);
+              if (line) {
+                const key = `${conn.from.id}->${conn.to.id}`;
+                connectionLinesMap.set(key, line);
+              }
+            }
+          });
+        }
+
+        function removeNodeConnections(nodeToRemove) {
+          const keysToRemove = [];
+          connectionLinesMap.forEach((line, key) => {
+            const [fromId, toId] = key.split("->");
+            if (fromId === nodeToRemove.id || toId === nodeToRemove.id) {
+              keysToRemove.push(key);
+              if (arrowSvg.contains(line)) {
+                arrowSvg.removeChild(line);
+              }
+            }
+          });
+          keysToRemove.forEach((key) => connectionLinesMap.delete(key));
+          window.connectionsArray = window.connectionsArray.filter(
+            (conn) => conn.from !== nodeToRemove && conn.to !== nodeToRemove
+          );
+        }
+      });
+
+      // 将 updateConnectionLine 提取到全局作用域
+      function updateConnectionLine(e) {
+        if (!isConnecting || !connectionLine) return;
+        const workspace = document.getElementById("workspace");
+        const workspaceRect = workspace.getBoundingClientRect();
+        connectionLine.setAttribute("x2", e.clientX - workspaceRect.left);
+        connectionLine.setAttribute("y2", e.clientY - workspaceRect.top);
+      }
+
+      // 验证博弈树
+      function validateGameTree() {
+        const workspace = document.getElementById("workspace");
+        const nodes = workspace.querySelectorAll(".draggable-node");
+        
+        // 收集工作区中的所有节点及其标签
+        const workspaceNodes = new Map();
+        nodes.forEach((node) => {
+          const labelElement = node.querySelector(".node-label");
+          if (labelElement) {
+            const label = labelElement.textContent.trim();
+            workspaceNodes.set(node.id, label);
+          }
+        });
+
+        // 收集所有连接关系
+        const connections = [];
+        window.connectionsArray.forEach((conn) => {
+          const fromLabel = workspaceNodes.get(conn.from.id);
+          const toLabel = workspaceNodes.get(conn.to.id);
+          if (fromLabel && toLabel) {
+            connections.push({ from: fromLabel, to: toLabel });
+          }
+        });
+
+        // 验证结果
+        const errors = [];
+        const warnings = [];
+
+        // 获取所有应该存在的节点（parentBoard中的所有节点，包括A）
+        const allRequiredNodes = new Set(["A"]);
+        Object.keys(parentBoard).forEach((node) => {
+          allRequiredNodes.add(node);
+        });
+
+        // 获取工作区中实际存在的节点标签
+        const existingNodes = new Set(Array.from(workspaceNodes.values()));
+
+        // 1. 检查所有必需的节点是否都存在
+        allRequiredNodes.forEach((requiredNode) => {
+          if (!existingNodes.has(requiredNode)) {
+            errors.push(`缺少节点${requiredNode}`);
+          }
+        });
+
+        // 2. 检查每个节点的父节点连接是否正确
+        const nodesWithConnections = new Set(); // 记录已有连接的节点，避免重复检查
+        
+        workspaceNodes.forEach((label, nodeId) => {
+          if (label === "A") return; // A是根节点，跳过
+
+          const expectedParent = parentBoard[label];
+          if (!expectedParent) {
+            warnings.push(`节点${label}未定义父节点`);
+            return;
+          }
+
+          // 检查父节点是否存在
+          if (!existingNodes.has(expectedParent)) {
+            errors.push(`节点${label}的父节点${expectedParent}缺失`);
+            return;
+          }
+
+          // 检查是否有从父节点到当前节点的连接
+          const hasCorrectConnection = connections.some(
+            (conn) => conn.from === expectedParent && conn.to === label
+          );
+
+          // 检查是否有错误的连接（从其他节点连接到当前节点）
+          const wrongConnections = connections.filter(
+            (conn) => conn.to === label && conn.from !== expectedParent
+          );
+
+          if (wrongConnections.length > 0) {
+            // 有错误的连接
+            wrongConnections.forEach((conn) => {
+              errors.push(`节点${label}连接错误：应为${expectedParent}→${label}`);
+            });
+            nodesWithConnections.add(label); // 标记为已检查
+          } else if (!hasCorrectConnection) {
+            // 没有正确的连接
+            errors.push(`节点${label}缺少父节点连接`);
+            nodesWithConnections.add(label); // 标记为已检查
+          } else {
+            // 连接正确
+            nodesWithConnections.add(label); // 标记为已检查
+          }
+        });
+
+        // 3. 检查是否有多余的连接（未定义的连接）
+        connections.forEach((conn) => {
+          const expectedParent = parentBoard[conn.to];
+          if (expectedParent && conn.from !== expectedParent) {
+            // 这个错误已经在上面检查过了，跳过
+            return;
+          }
+          if (!expectedParent && conn.to !== "A") {
+            warnings.push(`节点${conn.to}连接未定义`);
+          }
+        });
+
+        // 显示验证结果
+        showValidationResult(errors, warnings);
+      }
+
+      // 显示验证结果
+      function showValidationResult(errors, warnings) {
+        const modal = document.getElementById("validationModal");
+        const resultDiv = document.getElementById("validationResult");
+        
+        let html = "";
+
+        if (errors.length === 0 && warnings.length === 0) {
+          // 完全正确
+          html += `<div class="validation-result validation-success">`;
+          html += `<strong>✓ 验证通过！</strong><br>`;
+          html += `博弈树结构完整且正确，所有节点和连接关系都符合要求。`;
+          html += `</div>`;
+        } else {
+          // 有错误或警告，进行汇总
+          if (errors.length > 0) {
+            // 分类汇总错误
+            const missingNodes = [];
+            const missingParents = [];
+            const missingConnections = [];
+            const wrongConnections = [];
+
+            errors.forEach((error) => {
+              if (error.startsWith("缺少节点")) {
+                missingNodes.push(error.replace("缺少节点", ""));
+              } else if (error.includes("父节点") && error.includes("缺失")) {
+                missingParents.push(error);
+              } else if (error.includes("缺少父节点连接")) {
+                missingConnections.push(error.replace("节点", "").replace("缺少父节点连接", ""));
+              } else if (error.includes("连接错误")) {
+                wrongConnections.push(error);
+              }
+            });
+
+            html += `<div class="validation-result validation-error">`;
+            html += `<strong>✗ 验证失败，发现 ${errors.length} 个错误：</strong><br><br>`;
+
+            if (missingNodes.length > 0) {
+              html += `缺少节点：${missingNodes.join("、")}<br>`;
+            }
+            if (missingParents.length > 0) {
+              html += `父节点缺失：${missingParents.length}个<br>`;
+            }
+            if (missingConnections.length > 0) {
+              html += `缺少连接：${missingConnections.join("、")}<br>`;
+            }
+            if (wrongConnections.length > 0) {
+              html += `连接错误：${wrongConnections.length}个<br>`;
+            }
+
+            html += `</div>`;
+          }
+
+          if (warnings.length > 0) {
+            html += `<div class="validation-result validation-warning">`;
+            html += `<strong>⚠ 发现 ${warnings.length} 个警告</strong>`;
+            html += `</div>`;
+          }
+        }
+
+        resultDiv.innerHTML = html;
+        modal.style.display = "block";
+      }
+
+      // 关闭模态框
+      function closeValidationModal() {
+        const modal = document.getElementById("validationModal");
+        modal.style.display = "none";
+      }
+
+      // 点击模态框外部关闭
+      window.onclick = function(event) {
+        const modal = document.getElementById("validationModal");
+        if (event.target === modal) {
+          modal.style.display = "none";
+        }
+      }
+    </script>
+    <!-- 验证结果模态框 -->
+    <div id="validationModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-title">博弈树验证结果</div>
+          <button class="modal-close" onclick="closeValidationModal()">&times;</button>
+        </div>
+        <div id="validationResult"></div>
+      </div>
+    </div>
+
+  </body>
+</html>
