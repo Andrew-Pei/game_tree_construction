@@ -908,17 +908,7 @@
           connectionPoint.className = "connection-point";
           nodeA.appendChild(connectionPoint);
 
-          // 添加删除按钮
-          const deleteBtn = document.createElement("div");
-          deleteBtn.className = "delete-btn";
-          deleteBtn.textContent = "×";
-          deleteBtn.onclick = function (event) {
-            event.stopPropagation();
-            // 初始节点不允许删除
-            document.getElementById("statusMessage").textContent =
-              "初始节点不能删除！";
-          };
-          nodeA.appendChild(deleteBtn);
+          // 注意：节点A不添加删除按钮，因为它是初始节点，不可删除
 
           // 添加事件监听器
           connectionPoint.addEventListener(
