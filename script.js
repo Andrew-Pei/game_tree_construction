@@ -128,6 +128,12 @@ document.addEventListener("DOMContentLoaded", function () {
     nodeA.style.top = "20px";
     nodeA.style.transform = "translateX(-50%)";
 
+    // 添加标签
+    const nodeLabel = document.createElement("div");
+    nodeLabel.className = "node-label";
+    nodeLabel.textContent = "A";
+    nodeA.appendChild(nodeLabel);
+
     // 添加棋盘内容
     const board = document.createElement("div");
     board.className = "ttt-board";
@@ -137,18 +143,6 @@ document.addEventListener("DOMContentLoaded", function () {
               <div class="cell"></div><div class="cell">O</div><div class="cell">X</div>
           `;
     nodeA.appendChild(board);
-
-    // 添加标签
-    const nodeLabel = document.createElement("div");
-    nodeLabel.className = "node-label";
-    nodeLabel.textContent = "A";
-    nodeLabel.style.position = "absolute";
-    nodeLabel.style.bottom = "-20px";
-    nodeLabel.style.left = "50%";
-    nodeLabel.style.transform = "translateX(-50%)";
-    nodeLabel.style.fontWeight = "bold";
-    nodeLabel.style.color = "#1e40af";
-    nodeA.appendChild(nodeLabel);
 
     // 添加连接点
     const connectionPoint = document.createElement("div");
@@ -218,16 +212,16 @@ document.addEventListener("DOMContentLoaded", function () {
         e.clientY - workspace.getBoundingClientRect().top - 60 + "px";
       nodeElement.removeAttribute("draggable");
 
+      // 添加标签到棋盘框内（在ttt-board之前）
+      const board = nodeElement.querySelector(".ttt-board");
       const nodeLabel = document.createElement("div");
       nodeLabel.className = "node-label";
       nodeLabel.textContent = label;
-      nodeLabel.style.position = "absolute";
-      nodeLabel.style.bottom = "-20px";
-      nodeLabel.style.left = "50%";
-      nodeLabel.style.transform = "translateX(-50%)";
-      nodeLabel.style.fontWeight = "bold";
-      nodeLabel.style.color = "#1e40af";
-      nodeElement.appendChild(nodeLabel);
+      if (board) {
+        nodeElement.insertBefore(nodeLabel, board);
+      } else {
+        nodeElement.appendChild(nodeLabel);
+      }
 
       const connectionPoint = document.createElement("div");
       connectionPoint.className = "connection-point";
