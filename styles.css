@@ -148,13 +148,13 @@ button:hover {
   font-size: 1em;
 }
 .cell.new-move-o {
-  color: #3fe7f3;
+  color: #c82828;
   font-weight: 900;
   /* text-shadow: 0 0 3px rgba(63, 204, 243, 0.5); */
   /* transform: scale(1.1); */
 }
 .cell.new-move-x {
-  color: #ef4444;
+  color: #3fe7f3;
   font-weight: 900;
   /* text-shadow: 0 0 3px rgba(239, 68, 68, 0.5); */
   /* transform: scale(1.1); */

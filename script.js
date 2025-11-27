@@ -9,17 +9,17 @@ window.connectionsArray = [];
 
 // 所有棋盘的状态定义
 const boardStates = {
-  "A": ["O", "O", "X", "X", "", "", "", "O", "X"],
-  "B": ["O", "O", "X", "X", "O", "", "", "O", "X"],
-  "C": ["O", "O", "X", "X", "", "O", "", "O", "X"],
-  "D": ["O", "O", "X", "X", "", "", "O", "O", "X"],
-  "E": ["O", "O", "X", "X", "", "O", "X", "O", "X"],
-  "F": ["O", "O", "X", "X", "X", "O", "", "O", "X"],
-  "G": ["O", "O", "X", "X", "X", "", "O", "O", "X"],
-  "H": ["O", "O", "X", "X", "", "X", "O", "O", "X"],
-  "I": ["O", "O", "X", "X", "O", "O", "X", "O", "X"],
-  "J": ["O", "O", "X", "X", "X", "O", "O", "O", "X"],
-  "K": ["O", "O", "X", "X", "X", "O", "O", "O", "X"]
+  "A": ["X", "X", "O", "O", "", "", "", "X", "O"],
+  "B": ["X", "X", "O", "O", "X", "", "", "X", "O"],
+  "C": ["X", "X", "O", "O", "", "X", "", "X", "O"],
+  "D": ["X", "X", "O", "O", "", "", "X", "X", "O"],
+  "E": ["X", "X", "O", "O", "O", "X", "", "X", "O"],
+  "F": ["X", "X", "O", "O", "", "X", "O", "X", "O"],
+  "G": ["X", "X", "O", "O", "O", "", "X", "X", "O"],
+  "H": ["X", "X", "O", "O", "", "O", "X", "X", "O"],
+  "I": ["X", "X", "O", "O", "O", "X", "X", "X", "O"],
+  "J": ["X", "X", "O", "O", "X", "X", "O", "X", "O"],
+  "K": ["X", "X", "O", "O", "O", "X", "X", "X", "O"]
 };
 
 // 定义每个棋盘的父棋盘关系
@@ -52,6 +52,62 @@ function shufflePalette() {
   items.forEach((item) => {
     palette.appendChild(item);
   });
+}
+
+// 检测井字棋获胜情况，返回获胜的三个位置索引，如果没有获胜则返回null
+function checkWinner(boardState) {
+  // 所有可能的获胜组合：3行、3列、2条对角线
+  const winLines = [
+    [0, 1, 2], // 第一行
+    [3, 4, 5], // 第二行
+    [6, 7, 8], // 第三行
+    [0, 3, 6], // 第一列
+    [1, 4, 7], // 第二列
+    [2, 5, 8], // 第三列
+    [0, 4, 8], // 主对角线
+    [2, 4, 6]  // 副对角线
+  ];
+  
+  for (const line of winLines) {
+    const [a, b, c] = line;
+    if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+      return line; // 返回获胜的三个位置
+    }
+  }
+  
+  return null; // 没有获胜
+}
+
+// 高亮显示获胜的三个棋子
+function highlightWinningCells(board, boardState, newMovePiece = null, newMoveIndex = -1) {
+  // 先清除之前的高亮
+  const cells = board.querySelectorAll(".cell");
+  cells.forEach(cell => {
+    cell.classList.remove("winning-cell");
+  });
+  
+  // 检测获胜情况
+  const winningLine = checkWinner(boardState);
+  
+  if (winningLine) {
+    // 如果新落子在获胜线上，将获胜线的所有三个棋子都标记为新落子的颜色
+    if (newMovePiece && newMoveIndex >= 0 && winningLine.includes(newMoveIndex)) {
+      winningLine.forEach(index => {
+        cells[index].classList.add("winning-cell");
+        // 将获胜线的所有棋子都标记为新落子的颜色
+        if (newMovePiece === "O") {
+          cells[index].classList.add("new-move-o");
+        } else if (newMovePiece === "X") {
+          cells[index].classList.add("new-move-x");
+        }
+      });
+    } else {
+      // 如果没有新落子信息或新落子不在获胜线上，只添加高亮
+      winningLine.forEach(index => {
+        cells[index].classList.add("winning-cell");
+      });
+    }
+  }
 }
 
 // 标记新下的棋子
@@ -89,14 +145,18 @@ function markNewMoves() {
       }
     }
     // 标记最后下的棋子（索引最大的那个），根据棋子类型使用不同颜色
+    let newMovePiece = null;
     if (lastNewMoveIndex >= 0) {
-      const newMovePiece = currentBoard[lastNewMoveIndex];
+      newMovePiece = currentBoard[lastNewMoveIndex];
       if (newMovePiece === "O") {
         cells[lastNewMoveIndex].classList.add("new-move-o");
       } else if (newMovePiece === "X") {
         cells[lastNewMoveIndex].classList.add("new-move-x");
       }
     }
+    
+    // 高亮显示获胜的三个棋子，如果新落子在获胜线上，将另外两个棋子也标记为新落子的颜色
+    highlightWinningCells(board, currentBoard, newMovePiece, lastNewMoveIndex);
   });
 }
 
@@ -138,9 +198,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const board = document.createElement("div");
     board.className = "ttt-board";
     board.innerHTML = `
-              <div class="cell">O</div><div class="cell">O</div><div class="cell">X</div>
-              <div class="cell">X</div><div class="cell"></div><div class="cell"></div>
-              <div class="cell"></div><div class="cell">O</div><div class="cell">X</div>
+              <div class="cell">X</div><div class="cell">X</div><div class="cell">O</div>
+              <div class="cell">O</div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell">X</div><div class="cell">O</div>
           `;
     nodeA.appendChild(board);
 
@@ -296,14 +356,21 @@ document.addEventListener("DOMContentLoaded", function () {
               }
             }
             // 标记最后下的棋子（索引最大的那个），根据棋子类型使用不同颜色
+            let newMovePiece = null;
             if (lastNewMoveIndex >= 0) {
-              const newMovePiece = currentBoard[lastNewMoveIndex];
+              newMovePiece = currentBoard[lastNewMoveIndex];
               if (newMovePiece === "O") {
                 cells[lastNewMoveIndex].classList.add("new-move-o");
               } else if (newMovePiece === "X") {
                 cells[lastNewMoveIndex].classList.add("new-move-x");
               }
             }
+            
+            // 高亮显示获胜的三个棋子，如果新落子在获胜线上，将另外两个棋子也标记为新落子的颜色
+            highlightWinningCells(newBoard, currentBoard, newMovePiece, lastNewMoveIndex);
+          } else {
+            // 如果没有父棋盘，仍然检查是否有获胜情况
+            highlightWinningCells(newBoard, currentBoard);
           }
         }
       }
