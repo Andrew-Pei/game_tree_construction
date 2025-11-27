@@ -2,7 +2,7 @@ let isDragging = false;
 let draggedElement = null;
 let offsetX, offsetY;
 let isConnecting = false;
-let startNode = null;
+let startNode = null; // 移到全局作用域，以便updateConnectionLine可以访问
 let connectionLine = null;
 const connectionLinesMap = new Map();
 window.connectionsArray = [];
@@ -376,7 +376,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       
       document.getElementById("statusMessage").textContent =
-        "节点已添加！可拖动调整位置或点击节点下方连接点绘制箭头。";
+        "节点已添加！点击节点下方连接点绘制箭头。";
     }
   });
 
@@ -445,30 +445,30 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
   
+  // 添加ESC键取消连接
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && isConnecting) {
+      cancelConnection();
+      const statusMsg = document.getElementById("statusMessage");
+      statusMsg.textContent = "连接已取消（按ESC键）。";
+      statusMsg.classList.remove("status-connecting");
+    }
+  });
+  
   // 处理页面失去焦点或窗口关闭时清理连接状态
   window.addEventListener("beforeunload", function() {
-    if (isConnecting && connectionLine) {
-      const arrowSvg = document.getElementById("arrow-svg");
-      if (arrowSvg && arrowSvg.contains(connectionLine)) {
-        arrowSvg.removeChild(connectionLine);
-      }
-      document.removeEventListener("mousemove", updateConnectionLine);
+    if (isConnecting) {
+      cancelConnection();
     }
   });
   
   // 处理鼠标离开窗口时取消连接
   document.addEventListener("mouseleave", function() {
-    if (isConnecting && connectionLine) {
-      const arrowSvg = document.getElementById("arrow-svg");
-      if (arrowSvg && arrowSvg.contains(connectionLine)) {
-        arrowSvg.removeChild(connectionLine);
-      }
-      document.removeEventListener("mousemove", updateConnectionLine);
-      isConnecting = false;
-      startNode = null;
-      connectionLine = null;
-      document.getElementById("statusMessage").textContent =
-        "连接已取消。";
+    if (isConnecting) {
+      cancelConnection();
+      const statusMsg = document.getElementById("statusMessage");
+      statusMsg.textContent = "连接已取消（鼠标离开窗口）。";
+      statusMsg.classList.remove("status-connecting");
     }
   });
 
@@ -478,15 +478,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // 如果已经在连接中，先取消之前的连接
     if (isConnecting && connectionLine) {
-      arrowSvg.removeChild(connectionLine);
-      connectionLine = null;
-      document.removeEventListener("mousemove", updateConnectionLine);
+      cancelConnection();
     }
 
     startNode = e.currentTarget.parentElement;
     isConnecting = true;
-    document.getElementById("statusMessage").textContent =
-      "点击并拖动连接点以创建箭头...";
+    
+    // 添加连接激活状态的视觉反馈
+    e.currentTarget.classList.add("connecting");
+    startNode.classList.add("node-connecting");
+    
+    // 显示更明显的提示
+    const statusMsg = document.getElementById("statusMessage");
+    statusMsg.textContent = "💡 拖动到目标节点上以创建箭头";
+    statusMsg.classList.add("status-connecting");
 
     const rect = startNode.getBoundingClientRect();
     const workspaceRect = workspace.getBoundingClientRect();
@@ -502,64 +507,127 @@ document.addEventListener("DOMContentLoaded", function () {
     connectionLine.setAttribute("y1", startY);
     connectionLine.setAttribute("x2", startX);
     connectionLine.setAttribute("y2", startY);
-    connectionLine.setAttribute("stroke", "#333");
-    connectionLine.setAttribute("stroke-width", "2");
+    connectionLine.setAttribute("stroke", "#3b82f6");
+    connectionLine.setAttribute("stroke-width", "2.5");
+    connectionLine.setAttribute("stroke-dasharray", "5,5");
+    connectionLine.setAttribute("opacity", "0.7");
     connectionLine.setAttribute("marker-end", "url(#arrowhead)");
+    connectionLine.classList.add("temp-connection");
     arrowSvg.appendChild(connectionLine);
 
     document.addEventListener("mousemove", updateConnectionLine);
+  }
+  
+  // 取消连接操作的统一函数
+  function cancelConnection() {
+    if (connectionLine && arrowSvg.contains(connectionLine)) {
+      arrowSvg.removeChild(connectionLine);
+    }
+    connectionLine = null;
+    isConnecting = false;
+    
+    // 清除视觉反馈
+    if (startNode) {
+      const connectionPoint = startNode.querySelector(".connection-point");
+      if (connectionPoint) {
+        connectionPoint.classList.remove("connecting");
+      }
+      startNode.classList.remove("node-connecting");
+    }
+    
+    // 清除所有节点的高亮状态
+    workspace.querySelectorAll(".draggable-node").forEach(node => {
+      node.classList.remove("node-target-highlight", "node-target-exists");
+    });
+    
+    // 清除状态提示样式
+    const statusMsg = document.getElementById("statusMessage");
+    statusMsg.classList.remove("status-connecting");
+    
+    startNode = null;
+    document.removeEventListener("mousemove", updateConnectionLine);
   }
 
   // updateConnectionLine 已移到全局作用域
 
   function finishConnection(e) {
-    if (!isConnecting) return;
-
-    if (connectionLine) {
-      arrowSvg.removeChild(connectionLine);
-      connectionLine = null;
+    if (!isConnecting) {
+      return;
     }
+
+    // 清除临时连接线
+    if (connectionLine && arrowSvg.contains(connectionLine)) {
+      arrowSvg.removeChild(connectionLine);
+    }
+    connectionLine = null;
+
+    // 清除连接激活状态的视觉反馈
+    if (startNode) {
+      const connectionPoint = startNode.querySelector(".connection-point");
+      if (connectionPoint) {
+        connectionPoint.classList.remove("connecting");
+      }
+      startNode.classList.remove("node-connecting");
+    }
+    
+    // 清除所有节点的高亮状态
+    workspace.querySelectorAll(".draggable-node").forEach(node => {
+      node.classList.remove("node-target-highlight", "node-target-exists");
+    });
+    
+    // 清除状态提示样式
+    const statusMsg = document.getElementById("statusMessage");
+    statusMsg.classList.remove("status-connecting");
 
     const targetNode = document.elementFromPoint(e.clientX, e.clientY);
     const actualTargetNode = targetNode?.closest(".draggable-node");
 
     if (actualTargetNode && actualTargetNode !== startNode) {
-      const rect = actualTargetNode.getBoundingClientRect();
-      const relativeY = e.clientY - rect.top;
-      if (relativeY <= rect.height / 2) {
-        const exists = window.connectionsArray.some(
-          (conn) =>
-            conn.from === startNode && conn.to === actualTargetNode
-        );
-        if (!exists) {
-          const line = drawConnection(startNode, actualTargetNode);
-          if (line) {
-            const key = `${startNode.id}->${actualTargetNode.id}`;
-            connectionLinesMap.set(key, line);
-            window.connectionsArray.push({
-              from: startNode,
-              to: actualTargetNode,
-            });
-          }
-          document.getElementById("statusMessage").textContent =
-            "箭头已创建！";
-        } else {
-          document.getElementById("statusMessage").textContent =
-            "该连接已存在。";
+      // 检查连接是否已存在
+      const exists = window.connectionsArray.some(
+        (conn) =>
+          conn.from === startNode && conn.to === actualTargetNode
+      );
+      
+      if (!exists) {
+        // 创建新连接（箭头终点会自动连接到节点顶部）
+        const line = drawConnection(startNode, actualTargetNode);
+        if (line) {
+          const key = `${startNode.id}->${actualTargetNode.id}`;
+          connectionLinesMap.set(key, line);
+          window.connectionsArray.push({
+            from: startNode,
+            to: actualTargetNode,
+          });
+          
+          const statusMsg = document.getElementById("statusMessage");
+          statusMsg.textContent = "✅ 箭头已创建！";
+            statusMsg.classList.remove("status-connecting");
+            statusMsg.classList.add("status-success");
+            setTimeout(() => {
+              statusMsg.classList.remove("status-success");
+            }, 2000);
         }
-      } else {
-        document.getElementById("statusMessage").textContent =
-          "请将箭头连接到目标节点的上半部分。";
-      }
+        } else {
+          const statusMsg = document.getElementById("statusMessage");
+          statusMsg.textContent = "⚠️ 该连接已存在，无法重复创建。";
+          statusMsg.classList.remove("status-connecting");
+          statusMsg.classList.add("status-warning");
+          setTimeout(() => {
+            statusMsg.classList.remove("status-warning");
+          }, 2000);
+        }
     } else {
-      document.getElementById("statusMessage").textContent =
-        "连接已取消。";
+      const statusMsg = document.getElementById("statusMessage");
+      statusMsg.textContent = "连接已取消。";
+      statusMsg.classList.remove("status-connecting");
     }
 
     isConnecting = false;
     startNode = null;
     document.removeEventListener("mousemove", updateConnectionLine);
   }
+  
 
   function drawConnection(fromNode, toNode) {
     if (!workspace.contains(fromNode) || !workspace.contains(toNode)) {
@@ -586,14 +654,15 @@ document.addEventListener("DOMContentLoaded", function () {
     line.setAttribute("stroke", "#333");
     line.setAttribute("stroke-width", "2");
     line.setAttribute("marker-end", "url(#arrowhead)");
+    line.classList.add("connection-line");
 
     arrowSvg.appendChild(line);
     return line;
   }
 
   function redrawConnections() {
-    // 只选择line元素，排除defs中的marker
-    const lines = arrowSvg.querySelectorAll('line');
+    // 只选择line元素，排除defs中的marker和临时连接线
+    const lines = arrowSvg.querySelectorAll('line.connection-line');
     lines.forEach((line) => {
       if (arrowSvg.contains(line)) {
         arrowSvg.removeChild(line);
@@ -628,6 +697,9 @@ document.addEventListener("DOMContentLoaded", function () {
       (conn) => conn.from !== nodeToRemove && conn.to !== nodeToRemove
     );
   }
+  
+  // 将cancelConnection暴露到全局作用域，以便在事件处理中使用
+  window.cancelConnection = cancelConnection;
 });
 
 // 将 updateConnectionLine 提取到全局作用域
@@ -635,8 +707,42 @@ function updateConnectionLine(e) {
   if (!isConnecting || !connectionLine) return;
   const workspace = document.getElementById("workspace");
   const workspaceRect = workspace.getBoundingClientRect();
-  connectionLine.setAttribute("x2", e.clientX - workspaceRect.left);
-  connectionLine.setAttribute("y2", e.clientY - workspaceRect.top);
+  const mouseX = e.clientX - workspaceRect.left;
+  const mouseY = e.clientY - workspaceRect.top;
+  
+  connectionLine.setAttribute("x2", mouseX);
+  connectionLine.setAttribute("y2", mouseY);
+  
+  // 检查鼠标是否悬停在目标节点上，提供视觉反馈
+  const targetNode = document.elementFromPoint(e.clientX, e.clientY)?.closest(".draggable-node");
+  
+  // 清除所有节点的高亮
+  workspace.querySelectorAll(".draggable-node").forEach(node => {
+    node.classList.remove("node-target-highlight", "node-target-exists");
+  });
+  
+  // 如果悬停在有效目标节点上，高亮显示（允许连接到整个节点）
+  if (targetNode && targetNode !== startNode) {
+    targetNode.classList.add("node-target-highlight");
+    // 检查是否已存在连接
+    const exists = window.connectionsArray.some(
+      (conn) => conn.from === startNode && conn.to === targetNode
+    );
+    if (exists) {
+      targetNode.classList.add("node-target-exists");
+      // 更新状态栏提示
+      const statusMsg = document.getElementById("statusMessage");
+      statusMsg.textContent = "⚠️ 该连接已存在，无法重复创建。";
+    } else {
+      // 更新状态栏提示
+      const statusMsg = document.getElementById("statusMessage");
+      statusMsg.textContent = "✅ 释放鼠标完成连接。";
+    }
+  } else {
+    // 没有悬停在有效节点上，恢复默认提示
+    const statusMsg = document.getElementById("statusMessage");
+    statusMsg.textContent = "💡 拖动到目标节点上以创建箭头";
+  }
 }
 
 // 验证博弈树
