@@ -39,20 +39,127 @@ const parentBoard = {
 
 // 随机打乱棋盘库中的棋盘顺序
 function shufflePalette() {
-  const palette = document.getElementById("nodePalette");
-  const items = Array.from(palette.querySelectorAll(".palette-item"));
-  
-  // Fisher-Yates 洗牌算法
-  for (let i = items.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [items[i], items[j]] = [items[j], items[i]];
-  }
-  
-  // 重新排列DOM元素
-  items.forEach((item) => {
-    palette.appendChild(item);
-  });
+    const palette = document.getElementById("nodePalette");
+    const items = Array.from(palette.querySelectorAll(".palette-item"));
+    
+    // Fisher-Yates 洗牌算法
+    for (let i = items.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [items[i], items[j]] = [items[j], items[i]];
+    }
+    
+    // 重新排列DOM元素
+    items.forEach((item) => {
+      palette.appendChild(item);
+    });
 }
+
+// 根据标签创建棋盘库项
+function createPaletteItem(label) {
+    if (!boardStates[label]) return null;
+    
+    const paletteItem = document.createElement("div");
+    paletteItem.className = "palette-item";
+    
+    const draggableNode = document.createElement("div");
+    draggableNode.className = "draggable-node";
+    draggableNode.setAttribute("draggable", "true");
+    
+    const nodeLabel = document.createElement("div");
+    nodeLabel.className = "node-label";
+    nodeLabel.textContent = label;
+    
+    const tttBoard = document.createElement("div");
+    tttBoard.className = "ttt-board";
+    
+    const boardState = boardStates[label];
+    boardState.forEach(cellValue => {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.textContent = cellValue;
+      tttBoard.appendChild(cell);
+    });
+    
+    draggableNode.appendChild(nodeLabel);
+    draggableNode.appendChild(tttBoard);
+    paletteItem.appendChild(draggableNode);
+    
+    // 标记新棋子
+    markNewMovesForBoard(tttBoard, label);
+    
+    return paletteItem;
+}
+
+// 为单个棋盘标记新棋子（用于新创建的棋盘库项）
+function markNewMovesForBoard(board, boardLabel) {
+    if (!boardLabel || !boardStates[boardLabel]) return;
+    
+    const cells = board.querySelectorAll(".cell");
+    const currentBoard = Array.from(cells).map(cell => cell.textContent.trim());
+    
+    const parentLabel = parentBoard[boardLabel];
+    if (!parentLabel || !boardStates[parentLabel]) {
+      return;
+    }
+    
+    const parentBoardState = boardStates[parentLabel];
+    
+    let lastNewMoveIndex = -1;
+    for (let i = 0; i < 9; i++) {
+      if (parentBoardState[i] !== currentBoard[i] && currentBoard[i] !== "") {
+        lastNewMoveIndex = i;
+      }
+    }
+    
+    let newMovePiece = null;
+    if (lastNewMoveIndex >= 0) {
+      newMovePiece = currentBoard[lastNewMoveIndex];
+      if (newMovePiece === "O") {
+        cells[lastNewMoveIndex].classList.add("new-move-o");
+      } else if (newMovePiece === "X") {
+        cells[lastNewMoveIndex].classList.add("new-move-x");
+      }
+    }
+    
+    highlightWinningCells(board, currentBoard, newMovePiece, lastNewMoveIndex);
+}
+
+// 从棋盘库中移除指定标签的棋盘
+function removePaletteItemByLabel(label) {
+    const palette = document.getElementById("nodePalette");
+    const items = palette.querySelectorAll(".palette-item");
+    
+    for (const item of items) {
+      const labelElement = item.querySelector(".node-label");
+      if (labelElement && labelElement.textContent.trim() === label) {
+        item.remove();
+        return true;
+      }
+    }
+    return false;
+}
+
+// 将棋盘归还到棋盘库
+function returnBoardToPalette(label) {
+    const palette = document.getElementById("nodePalette");
+    
+    // 检查是否已经存在该标签的棋盘
+    const existingItems = palette.querySelectorAll(".palette-item");
+    for (const item of existingItems) {
+      const labelElement = item.querySelector(".node-label");
+      if (labelElement && labelElement.textContent.trim() === label) {
+        // 如果已经存在，就不重复添加
+        return;
+      }
+    }
+    
+    // 创建新的棋盘库项
+    const newItem = createPaletteItem(label);
+    if (newItem) {
+      palette.appendChild(newItem);
+      // 注意：由于使用了事件委托，新添加的节点会自动支持拖拽，无需重新绑定
+    }
+  }
 
 // 检测井字棋获胜情况，返回获胜的三个位置索引，如果没有获胜则返回null
 function checkWinner(boardState) {
@@ -226,19 +333,29 @@ document.addEventListener("DOMContentLoaded", function () {
       "初始棋盘A已加载！请开始构建博弈树。";
   }
 
+  // 使用事件委托设置拖拽功能，避免重复绑定
   function setupDraggableNodes() {
-    const nodes = palette.querySelectorAll(".draggable-node");
-    nodes.forEach((node) => {
-      node.addEventListener("dragstart", function (e) {
-        const label =
-          this.closest(".palette-item").querySelector(
-            ".node-label"
-          ).textContent;
-        e.dataTransfer.setData("text/html", e.target.outerHTML);
-        e.dataTransfer.setData("text/plain", label);
-        e.dataTransfer.effectAllowed = "copy";
-      });
-    });
+    // 移除旧的监听器（如果存在）
+    if (palette._dragStartHandler) {
+      palette.removeEventListener("dragstart", palette._dragStartHandler);
+    }
+    
+    // 创建新的处理器
+    palette._dragStartHandler = function(e) {
+      const node = e.target.closest(".draggable-node");
+      if (!node || !palette.contains(node)) return;
+      
+      const label =
+        node.closest(".palette-item").querySelector(
+          ".node-label"
+        ).textContent;
+      e.dataTransfer.setData("text/html", node.outerHTML);
+      e.dataTransfer.setData("text/plain", label);
+      e.dataTransfer.effectAllowed = "copy";
+    };
+    
+    // 绑定到palette容器上（事件委托）
+    palette.addEventListener("dragstart", palette._dragStartHandler);
   }
   setupDraggableNodes();
 
@@ -299,6 +416,10 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
         
+        // 获取节点的标签，用于归还到棋盘库
+        const labelElement = nodeElement.querySelector(".node-label");
+        const boardLabel = labelElement ? labelElement.textContent.trim() : null;
+        
         // 计算实际节点数量（排除svg和placeholder）
         const nodes = workspace.querySelectorAll(".draggable-node");
         if (nodes.length <= 1) {
@@ -318,6 +439,12 @@ document.addEventListener("DOMContentLoaded", function () {
           removeNodeConnections(nodeElement);
           nodeElement.remove();
         }
+        
+        // 将棋盘归还到棋盘库
+        if (boardLabel && boardLabel !== "A") {
+          returnBoardToPalette(boardLabel);
+        }
+        
         document.getElementById("statusMessage").textContent =
           "节点已删除。";
       };
@@ -330,6 +457,9 @@ document.addEventListener("DOMContentLoaded", function () {
       nodeElement.addEventListener("mousedown", handleNodeMouseDown);
 
       workspace.appendChild(nodeElement);
+      
+      // 从棋盘库中移除源棋盘
+      removePaletteItemByLabel(label);
       
       // 确保新添加的节点也标记了新棋子
       const newBoard = nodeElement.querySelector(".ttt-board");
@@ -860,7 +990,7 @@ function showValidationResult(errors, warnings) {
   if (errors.length === 0 && warnings.length === 0) {
     // 完全正确
     html += `<div class="validation-result validation-success">`;
-    html += `<strong>✓ 验证通过！请前往UMU平台完成活动2问卷</strong><br>`;
+    html += `<strong>✓ 验证通过！请前往<a href="https://www.umu.cn/course/index#/groups/7187322/sessions/57840738/view" target="_blank">UMU平台</a>完成活动2问卷</strong><br>`;
     html += `博弈树结构完整且正确，所有节点和连接关系都符合要求。`;
     html += `</div>`;
   } else {
